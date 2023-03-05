@@ -6,7 +6,7 @@ import numpy as np
 
 class pret:
     """
-
+    Cette classe définit toutes les informations utiles pour déterminer l'échéancier d'un prêt bancaire
     """
     def __init__(self, montant_ini, taux, mensualite):
         """ (self) -> None
