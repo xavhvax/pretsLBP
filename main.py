@@ -1,29 +1,32 @@
 # Press Maj+F10 to execute it or replace it with your code.
 # Press Double Shift to search everywhere for classes, files, tool windows, actions, and settings.
 import numpy as np
+import pandas as pd
 np.set_printoptions(formatter={'float':'{:10.2f}'.format})
+pd.options.display.float_format = "{:.2f}".format
 
+pd.DataFrame()
 class pret:
     """
     Cette classe définit toutes les informations utiles pour déterminer l'échéancier d'un prêt bancaire
     """
     def __init__(self, montant_ini, taux, mensualite, nb_mois):
         """ (self) -> None
-        self.mensualite: montant de la mensualité (en €)
+        :param self.mensualite: montant de la mensualité (en €)
         """
         self.montant_ini=montant_ini
         self.taux=taux # par an
         self.mensualite=mensualite
         self.nb_mois=nb_mois
 
-        self.echeancier=np.array([[montant_ini, 0.]])
+        self.echeancier=np.array([[montant_ini, 0., 0., 0.]])
         self.update()
 
         return None
 
     def update(self):
         """" (self) -> None
-
+        :param self:
         """
         #reste[1]=reste[0]x(1+q)-mensualite
         #[...]
@@ -36,12 +39,17 @@ class pret:
         for mois in np.arange(self.nb_mois):
             #self.nb_mois += 1
             self.echeancier=np.concatenate((self.echeancier,
-                                            [[self.echeancier[-1][0]*(1.+q)-self.mensualite, self.echeancier[-1][0]*q]]))
+                                            [[self.echeancier[-1][0]*(1.+q)-self.mensualite,
+                                              self.mensualite-self.echeancier[-1][0]*q,
+                                              self.echeancier[-1][0]*q,
+                                              self.echeancier[-1][-1]+self.echeancier[-1][0]*q]]))
         return None
 
     def determine_mensualite(self):
         """ (self) -> float
-        self.determine_mensualite()
+        cette méthode permet d'évaluer le montant de la mensualité pour rembourser le prêt de self.montant_ini
+        au taux de self.taux en self.nb_mois
+        :param self:
         :return: renvoie la mensualité pour rembourser le prêt en nb_mois
         """
         # par définition : 1+taux=(1+q)^12
@@ -112,7 +120,7 @@ if __name__ == '__main__':
     #pret190k = pret(montant_ini=190.e3,taux=(1.+((189009.93+1124.65)/190.e3-1.))**12.-1.,mensualite=1124.65)
     pret190k = pret(montant_ini=190.e3, taux=0.0085, mensualite=1124.65, nb_mois=180)
 
-    print(pret190k.echeancier)
+    print(pd.DataFrame(pret190k.echeancier,columns=['reste', 'capital', 'intérêts', 'intérêts cumulés']))
     #print("taux : " + str((1.+((189009.93+1124.65)/190.e3-1.))**12.-1.))
     print("taux : " + str(12.*((189009.93 + 1124.65) / 190.e3 - 1.))) # => 0.00849978947368335
     print("taux : " + str(0.0085)) # => indiqué dans les papiers de la banque
