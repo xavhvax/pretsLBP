@@ -61,5 +61,5 @@ On peut s'en sortir en passant par des développements limités, ce qui fonction
 \left(\alpha q+\alpha Nq^2+\alpha\frac{N(N-1)}{2!}q^3+o(q^3)\right) - \left(Nq+\frac{N(N-1)}{2!}q^2+\frac{N(N-1)(N-2)}{3!}q^3+o(q^3)\right)&=0\\
 (\alpha-N) q+N\left(\alpha -\frac{N-1}{2!}\right)q^2+N(N-1)\left(\frac{\alpha}{2!}-\frac{(N-2)}{3!}\right)q^3+o(q^3)&=0
 \end{align}
-
+```
 Au final, on peut estimer assez finement le taux par mois $q$ (et donc le taux fourni par la banque $12\cdot q$ en trouvant les racines de ce polynôme d'ordre 3, par exemple à l'aide de numpy (method roots de np.polynomial.Polynomial). Sans difficulté on peut monter à l'ordre 4 ou 5.
