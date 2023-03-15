@@ -31,7 +31,7 @@ class pret:
         #reste[1]=reste[0]x(1+q)-mensualite
         #[...]
         #reste[n]=reste[n-1]x(1+q)-mensualite
-        # par définition : $1+taux=(1+q)^{12}$
+        # par définition : .. math:`1+taux=(1+q)^{12}`
         #q=(1.+self.taux)**(1./12.)-1.
         q=self.taux/12.
 
