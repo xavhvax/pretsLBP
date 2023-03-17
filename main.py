@@ -4,23 +4,25 @@ import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
 
-np.set_printoptions(formatter={'float':'{:10.2f}'.format})
+np.set_printoptions(formatter={'float': '{:10.2f}'.format})
 pd.options.display.float_format = "{:.2f}".format
-#pd.set_option('display.max_rows', None) # print tout le pd.DataFrame, pas seulement un nb limité de lignes
 
-class pret:
+# pd.set_option('display.max_rows', None) # print tout le pd.DataFrame, pas seulement un nb limité de lignes
+
+class Pret:
     """
     Cette classe définit toutes les informations utiles pour déterminer l'échéancier d'un prêt bancaire
     """
+
     def __init__(self, montant_ini, taux, mensualite, nb_mois):
         """ (self) -> None
         :param self.mensualite: montant de la mensualité (en €)
         """
-        self.montant_ini=montant_ini
-        self.taux=taux # par an
+        self.montant_ini = montant_ini
+        self.taux = taux  # par an
 
         if type(nb_mois) is list:
-            assert (len(mensualite)==len(nb_mois)),\
+            assert (len(mensualite) == len(nb_mois)), \
                 "il faut avoir autant de changement de mensualité que de changement de nb de mois"
             self.mensualite = mensualite
             self.nb_mois = nb_mois
@@ -30,34 +32,51 @@ class pret:
 
         self.update()
 
-    def update(self):
+    def update(self, cash=0, mois_du_cash=0):
         """" (self) -> None
         :param self:
+        :param cash:
+        :param mois_du_cash:
         """
-        #reste[1]=reste[0]x(1+q)-mensualite
-        #[...]
-        #reste[n]=reste[n-1]x(1+q)-mensualite
+        # reste[1]=reste[0]x(1+q)-mensualite
+        # [...]
+        # reste[n]=reste[n-1]x(1+q)-mensualite
         # par définition : :math:`1+taux=(1+q)^{12}`
-        #q=(1.+self.taux)**(1./12.)-
-        q=self.taux/12.
+        # q=(1.+self.taux)**(1./12.)-
+        q = self.taux / 12.
 
-        #while self.echeancier[-1][0]>0:
-        L=[[self.montant_ini, 0., 0., 0.]]
-        k=0
-        for m,n in zip(self.mensualite, self.nb_mois):
-            while k<n:
-                k+=1
-                reste   = L[-1][0]
-                interet = reste*q
-                capital = np.round(m-interet,2) # en prenant en compte cet arrondi, on retrouve exactement l'échéancier de la banque
-                interet_cumule = L[-1][-1]+interet
-                L.append([reste-capital,
+        # while self.echeancier[-1][0]>0:
+        l=[[]]
+        if hasattr(self,"echeancier"):
+            print(self.echeancier.loc[mois_du_cash,:].values.tolist())
+            l = [(self.echeancier.loc[mois_du_cash,:].values-np.array([cash,0.,0.,0.])).tolist()]
+        else:
+            l = [[self.montant_ini, 0., 0., 0.]]
+
+        k = mois_du_cash
+        for m, n in zip(self.mensualite, self.nb_mois):
+            while k < n:
+                k += 1
+                reste = l[-1][0]
+                interet = reste * q
+                capital = np.round(m - interet,
+                                   2)  # en prenant en compte cet arrondi, on retrouve exactement l'échéancier de la banque
+                interet_cumule = l[-1][-1] + interet
+                l.append([reste - capital,
                           capital,
                           interet,
                           interet_cumule])
 
-        self.echeancier = pd.DataFrame(L, columns=['reste', 'capital', 'intérêts', 'intérêts cumulés'])
-        return None
+        if hasattr(self,"echeancier"):
+            self.echeancier[mois_du_cash:] = pd.DataFrame(l, columns=['reste',
+                                                                      'capital',
+                                                                      'intérêts',
+                                                                      'intérêts cumulés'])
+        else:
+            self.echeancier = pd.DataFrame(l, columns=['reste',
+                                                       'capital',
+                                                       'intérêts',
+                                                       'intérêts cumulés'])
 
     def determine_mensualite(self):
         """ (self) -> float
@@ -72,9 +91,9 @@ class pret:
         # par définition : 1+taux=(1+q)^12
         # q=(1.+self.taux)**(1./12.)-1.
         q = self.taux / 12.
-        n=self.nb_mois[0]
+        n = self.nb_mois[0]
         # reste[0] x q / mensualite  = 1-1/(1+q)^n
-        return self.montant_ini*(1.+q)**n*q/((1.+q)**n-1.)
+        return self.montant_ini * (1. + q) ** n * q / ((1. + q) ** n - 1.)
 
     def determine_duree(self):
         """ (self) -> float
@@ -91,8 +110,7 @@ class pret:
         q = self.taux / 12.
 
         # ln(1 - reste[0] x q / mensualite)  = -n ln (1+q)
-        return -np.log(1-self.montant_ini*q/self.mensualite[0])/np.log(1+q)
-
+        return -np.log(1 - self.montant_ini * q / self.mensualite[0]) / np.log(1 + q)
 
     def determine_taux(self):
         """ (self) -> float
@@ -117,47 +135,74 @@ class pret:
         if len(self.nb_mois) > 1:
             return "méthode non implémentée si changement de mensualité en cours de remboursement"
 
-        ratio=self.montant_ini/self.mensualite[0]
-        n=self.nb_mois[0]
-        p=np.polynomial.Polynomial((0.,
-                                    ratio-n,
-                                    n*(ratio-(n-1)/np.math.factorial(2)),
-                                    n*(n - 1)*(ratio/np.math.factorial(2)-(n-2)/np.math.factorial(3)), # ordre 3
-                                    n*(n-1)*(n-2)*(ratio/np.math.factorial(3)-(n-3)/np.math.factorial(4)), # ordre 4
-                                    #n*(n-1)*(n-2)*(n-3)*(ratio/np.math.factorial(4)-(n-4)/np.math.factorial(5)) # ordre 5
-                                   ),
-                                   symbol='q')
-        #print(p.roots())
-        return 12.*np.real(p.roots()[-1]) # taux par an
+        ratio = self.montant_ini / self.mensualite[0]
+        n = self.nb_mois[0]
+        p = np.polynomial.Polynomial((0.,
+                                      ratio - n,
+                                      n * (ratio - (n - 1) / np.math.factorial(2)),
+                                      n * (n - 1) * (ratio / np.math.factorial(2) - (n - 2) / np.math.factorial(3)),
+                                      # ordre 3
+                                      n * (n - 1) * (n - 2) * (
+                                                  ratio / np.math.factorial(3) - (n - 3) / np.math.factorial(4)),
+                                      # ordre 4
+                                      # n*(n-1)*(n-2)*(n-3)*(ratio/np.math.factorial(4)-(n-4)/np.math.factorial(5)) # ordre 5
+                                      ),
+                                     symbol='q')
+        # print(p.roots())
+        return 12. * np.real(p.roots()[-1])  # taux par an
         # par définition : 1+taux=(1+q)^12
         # return (1.+np.real(p.roots()[-1]))**12.-1. # taux par an
+
+    def inject_cash_and_update(self, cash, mois_du_cash):
+        Pret(self, cash, mois_du_cash)
+        self.update()
+
+
+class SousPret(Pret):
+    """
+    Permet de modifier une portion de prêt
+    Impact le prêt jusqu'à sa fin
+    """
+    def __init__(self, pret, cash, mois_du_cash):
+        print('ok1')
+        pret.__init__(self) # initialise rapidement tous les attributs et calcule l'échéancier
+        self.montant_ini=super().echeancier[mois_du_cash]['reste']-cash
+        self.nb_mois=super().nb_mois-mois_du_cash
+        print(self.montant_ini, self.nb_mois)
+        self.update()
 
 def print_hi(name):
     # Use a breakpoint in the code line below to debug your script.
     print(f'Hi, {name}')  # Press Ctrl+F8 to toggle the breakpoint.
+
 
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
     # par définition : 1+taux=(1+q)^12
 
     # Construction du 1er prêt, de 196k€
-    #pret190k = pret(montant_ini=190.e3,taux=(1.+((189009.93+1124.65)/190.e3-1.))**12.-1.,mensualite=1124.65)
-    pret190k = pret(montant_ini=190.e3, taux=0.0085, mensualite=1124.65, nb_mois=180)
+    # pret190k = pret(montant_ini=190.e3,taux=(1.+((189009.93+1124.65)/190.e3-1.))**12.-1.,mensualite=1124.65)
+    pret190k = Pret(montant_ini=190.e3, taux=0.0085, mensualite=1124.65, nb_mois=180)
 
     print(pret190k.echeancier)
-    #print("taux : " + str((1.+((189009.93+1124.65)/190.e3-1.))**12.-1.))
-    print("taux : " + str(12.*((189009.93 + 1124.65) / 190.e3 - 1.))) # => 0.00849978947368335
-    print("taux : " + str(0.0085)) # => indiqué dans les papiers de la banque
+    # print("taux : " + str((1.+((189009.93+1124.65)/190.e3-1.))**12.-1.))
+    print("taux : " + str(12. * ((189009.93 + 1124.65) / 190.e3 - 1.)))  # => 0.00849978947368335
+    print("taux : " + str(0.0085))  # => indiqué dans les papiers de la banque
 
     # Quelques estimations et vérifications
-    print("taux estimé : "       +str(pret190k.determine_taux()))
-    print("durée estimée : "     +str(pret190k.determine_duree()))
-    print("mensualité estimée : "+str(pret190k.determine_mensualite()))
+    print("taux estimé : " + str(pret190k.determine_taux()))
+    print("durée estimée : " + str(pret190k.determine_duree()))
+    print("mensualité estimée : " + str(pret190k.determine_mensualite()))
 
     # Construction du 1er prêt, de 266k€
-    pret266k = pret(montant_ini=266.e3, taux=0.013, mensualite=[294.83+288.17,1619.65+224.72], nb_mois=[180,300])
+    pret266k = Pret(montant_ini=266.e3, taux=0.013, mensualite=[294.83 + 288.17, 1619.65 + 224.72], nb_mois=[180, 300])
     print(pret266k.echeancier)
-    pret_tot=pret190k.echeancier.add(pret266k.echeancier, fill_value=0)
+
+    # Ajout de 50k€ de cash à 20 ans du 2ème prêt
+    pret266k.update(cash=50.e3,mois_du_cash=20*12)
+    print(pret266k.echeancier)
+
+    pret_tot = pret190k.echeancier.add(pret266k.echeancier, fill_value=0)
 
     # Quelques graphs
     print(pret_tot)
