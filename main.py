@@ -32,6 +32,13 @@ class Pret:
 
         self.update()
 
+        # on stocke le cout final du prêt dans une variable, pour mémoire
+        cout_prets_ini=self.echeancier['intérêts cumulés'].values[-1]
+        self.interets_cumulés_tot_ini=pd.DataFrame([[cout_prets_ini, cout_prets_ini/self.montant_ini]],
+                                                   columns=['cout_pret_ini (€)', 'cout_pret_ini (%)'])
+        self.interets_cumulés_tot_ini.style.hide_index()
+        print(self.interets_cumulés_tot_ini)
+
     def update(self, cash=0, mois_du_cash=0):
         """" (self) -> None
         :param self:
@@ -205,6 +212,7 @@ if __name__ == '__main__':
     pret_tot = pret190k.echeancier.add(pret266k.echeancier, fill_value=0)
 
     # Quelques graphs
+    exit()
     print(pret_tot)
     fig, ax1 = plt.subplots()
     plt.xlabel('mois')
