@@ -34,17 +34,19 @@ class Pret:
 
         # on stocke le cout final du prêt dans une variable, pour mémoire
         cout_prets_ini=self.echeancier['intérêts cumulés'].values[-1]
-        self.interets_cumulés_tot_ini=pd.DataFrame([[cout_prets_ini, cout_prets_ini/self.montant_ini]],
+        self.interets_cumules_tot_ini=pd.DataFrame([[cout_prets_ini, 100.*cout_prets_ini/self.montant_ini]],
                                                    columns=['cout_pret_ini (€)', 'cout_pret_ini (%)'])
-        self.interets_cumulés_tot_ini.style.hide_index()
-        print(self.interets_cumulés_tot_ini)
+        #self.interets_cumules_tot_ini.style.hide_index()
+        print(self.interets_cumules_tot_ini)
 
-    def update(self, cash=0, mois_du_cash=0):
+    def update(self, cash=0, mois_du_cash=0, mensualite_variation=0.):
         """" (self) -> None
         :param self:
         :param cash:
         :param mois_du_cash:
         """
+        assert(-0.1<mensualite_variation<0.1), \
+            "La variation des mensualités doit être comprise entre -10% et +10%"
         # reste[1]=reste[0]x(1+q)-mensualite
         # [...]
         # reste[n]=reste[n-1]x(1+q)-mensualite
@@ -55,7 +57,7 @@ class Pret:
         # while self.echeancier[-1][0]>0:
         l=[[]]
         if hasattr(self,"echeancier"):
-            print(self.echeancier.loc[mois_du_cash,:].values.tolist())
+            #print(self.echeancier.loc[mois_du_cash,:].values.tolist())
             l = [(self.echeancier.loc[mois_du_cash,:].values-np.array([cash,0.,0.,0.])).tolist()]
         else:
             l = [[self.montant_ini, 0., 0., 0.]]
@@ -66,8 +68,7 @@ class Pret:
                 k += 1
                 reste = l[-1][0]
                 interet = reste * q
-                capital = np.round(m - interet,
-                                   2)  # en prenant en compte cet arrondi, on retrouve exactement l'échéancier de la banque
+                capital = np.round(m*(1.+mensualite_variation) - interet,2) # en prenant en compte cet arrondi, on retrouve exactement l'échéancier de la banque
                 interet_cumule = l[-1][-1] + interet
                 l.append([reste - capital,
                           capital,
@@ -85,6 +86,17 @@ class Pret:
                                                        'intérêts',
                                                        'intérêts cumulés'])
 
+        # On supprime les derniers mois car on a fini de rembourser le prêt
+        #cf. https://stackoverflow.com/questions/13851535/how-to-delete-rows-from-a-pandas-dataframe-based-on-a-conditional-expression
+        self.echeancier.drop(self.echeancier[self.echeancier.reste < 0.].index[1:], inplace=True)
+        interets_cumules_tot_new=np.round(self.echeancier['intérêts cumulés'].values[-1],2)
+        if hasattr(self,"interets_cumules_tot_ini"):
+            print("gain abs (€) & gain relatif (%)")
+            print(self.interets_cumules_tot_ini.values[0][0]-interets_cumules_tot_new, 100.*interets_cumules_tot_new/self.montant_ini)
+            return
+        else:
+            return
+
     def determine_mensualite(self):
         """ (self) -> float
         cette méthode permet d'évaluer le montant de la mensualité pour rembourser le prêt de self.montant_ini
@@ -100,7 +112,7 @@ class Pret:
         q = self.taux / 12.
         n = self.nb_mois[0]
         # reste[0] x q / mensualite  = 1-1/(1+q)^n
-        return self.montant_ini * (1. + q) ** n * q / ((1. + q) ** n - 1.)
+        return np.round(self.montant_ini * (1. + q) ** n * q / ((1. + q) ** n - 1.),3)
 
     def determine_duree(self):
         """ (self) -> float
@@ -117,7 +129,7 @@ class Pret:
         q = self.taux / 12.
 
         # ln(1 - reste[0] x q / mensualite)  = -n ln (1+q)
-        return -np.log(1 - self.montant_ini * q / self.mensualite[0]) / np.log(1 + q)
+        return np.round(-np.log(1 - self.montant_ini * q / self.mensualite[0]) / np.log(1 + q), 2)
 
     def determine_taux(self):
         """ (self) -> float
@@ -156,27 +168,9 @@ class Pret:
                                       ),
                                      symbol='q')
         # print(p.roots())
-        return 12. * np.real(p.roots()[-1])  # taux par an
+        return np.round(12. * np.real(p.roots()[-1]),5)  # taux par an
         # par définition : 1+taux=(1+q)^12
         # return (1.+np.real(p.roots()[-1]))**12.-1. # taux par an
-
-    def inject_cash_and_update(self, cash, mois_du_cash):
-        Pret(self, cash, mois_du_cash)
-        self.update()
-
-
-class SousPret(Pret):
-    """
-    Permet de modifier une portion de prêt
-    Impact le prêt jusqu'à sa fin
-    """
-    def __init__(self, pret, cash, mois_du_cash):
-        print('ok1')
-        pret.__init__(self) # initialise rapidement tous les attributs et calcule l'échéancier
-        self.montant_ini=super().echeancier[mois_du_cash]['reste']-cash
-        self.nb_mois=super().nb_mois-mois_du_cash
-        print(self.montant_ini, self.nb_mois)
-        self.update()
 
 def print_hi(name):
     # Use a breakpoint in the code line below to debug your script.
@@ -193,7 +187,7 @@ if __name__ == '__main__':
 
     print(pret190k.echeancier)
     # print("taux : " + str((1.+((189009.93+1124.65)/190.e3-1.))**12.-1.))
-    print("taux : " + str(12. * ((189009.93 + 1124.65) / 190.e3 - 1.)))  # => 0.00849978947368335
+    print("taux : " + str(np.round(12. * ((189009.93 + 1124.65) / 190.e3 - 1.),5)))  # => 0.00849978947368335
     print("taux : " + str(0.0085))  # => indiqué dans les papiers de la banque
 
     # Quelques estimations et vérifications
@@ -205,8 +199,9 @@ if __name__ == '__main__':
     pret266k = Pret(montant_ini=266.e3, taux=0.013, mensualite=[294.83 + 288.17, 1619.65 + 224.72], nb_mois=[180, 300])
     print(pret266k.echeancier)
 
-    # Ajout de 50k€ de cash à 20 ans du 2ème prêt
-    pret266k.update(cash=50.e3,mois_du_cash=20*12)
+    # Ajout de 50k€ de cash à 15 ans du 2ème prêt
+    print("\nAjout de 50k€ de cash à 15 ans du 2ème prêt")
+    pret266k.update(cash=50.e3,mois_du_cash=15*12)
     print(pret266k.echeancier)
 
     pret_tot = pret190k.echeancier.add(pret266k.echeancier, fill_value=0)
